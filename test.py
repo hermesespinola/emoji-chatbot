@@ -128,11 +128,11 @@ else:
     sentiments = get_sentiment_emoji_dict('emojis.csv')
     tweett = raw_input("tweet: ")
     extract_features = get_extract_features_fun(word_features)
+    sentiment = get_sentiment_emoji_dict('emojis.csv')
     while tweett:
         # Classify new input
         # clean tweet
         emojis, text = separateTweetEmojis(tweett)
-        sentiment = get_sentiment_emoji_dict = get_sentiment_emoji_dict('emojis.csv')
         sent, conf = emojisSentiment(emojis, sentiments)
         print 'Emojis:', sent + ',', conf / 100
         # Separa el tweet solo considerando los espacios
