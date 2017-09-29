@@ -14,7 +14,7 @@ parser.add_argument('--username', '-u', default='TheTweetOfGod',
 
 args = parser.parse_args()
 searchQuery = '@' + args.username
-maxTweets = 15000
+maxTweets = 400
 
 auth = tweepy.AppAuthHandler(consumer_key, consumer_secret)
 auth.secure = True

@@ -37,14 +37,12 @@ def get_sentiment_emoji_dict(csv_path):
         emojis = {}
         while emoji:
             code = emoji.pop('Unicode').encode()
-            if code in emojis:
-                print(code)
-            emojis[code] = emoji
+            emojis[code.lower()] = emoji
             emoji = next(reader, None)
         return emojis
 
 def extractEmojis(text):
-    listaEmociones = (''.join(c for c in text if (unicode(c,'utf-8') in emoji.UNICODE_EMOJI)))
+    listaEmociones = [c for c in text if (unicode(c,'utf-8') in emoji.UNICODE_EMOJI)]
     return listaEmociones
 
 def separateTweetEmojis(tweet):
@@ -52,66 +50,42 @@ def separateTweetEmojis(tweet):
     arrRegex = [a.encode('utf-8') for a in re.findall(u'[^\w\s,]',tweet.decode('utf-8'))]
     return extractEmojis(arrRegex), cleanseTweet(tweet)
 
-def cleanWord(tweet):
-    # Separa el tweet solo considerando los espacios
-    tweetArr = tweet.split()
-    # Quita signos de puntuación del tweet
-    table = string.maketrans("","")
-    tweet =  tweet.translate(table, string.punctuation).replace("¡"," ").replace("¿"," ")
-    # Crea un arreglo separado por el delimitador \\
-    tweetArr = unicode(tweet, 'utf-8').encode('unicode_escape').split('\\')
-    # Crea un arreglo con cada palabra y emoji
-    arrPalabras=[]
-    for t in tweetArr:
-        for element in t.split():
-            arrPalabras.append(stemmer.stem(element))
-    return arrPalabras
+default_sentiment = {
+    'Alegria': 0,
+    'Colera': 0,
+    'Miedo': 0,
+    'Tristeza': 0,
+    'Amor': 0,
+    'Sorpresa': 0,
+    'Verguenza': 0,
+    'Aversion': 0
+}
 
-def findEmotion(tweet, sentiments, emojis_file, text_file):
-    emojiArr, clntweet = separateTweetEmojis(tweet)
-    #if clntweet or emojiArr:
-    # Imprime el arreglo de emojis
-    #print("Emojis: " + emojiArr)
-    emojis_file.write(emojiArr)
-    emojis_file.write('\n')
-    # Imprime el tweet limpio
-    #print("Tweet Limpio: " + clntweet)
-    text_file.write(clntweet)
-    text_file.write('\n')
+def emojisSentiment(emojis, sentiments):
+    arr_sent=[]
+    for e in emojis:
+        e_repr = repr(unicode(e, 'utf-8'))[2:-1].lower()
+        sent = sentiments.get(e_repr, default_sentiment)
+        arr_sent.append(sent)
 
-    #print(tweet.strip()+", "+emojiArr.strip()+", "+clntweet)
-
-    arrPalabras = cleanWord(clntweet)
-
-    # Arreglo de las emociones del emoji
-    # Alegria,Colera,Miedo,Tristeza,Amor,Sorpresa,Verguenza,Aversion
-    arrEmociones = [0,0,0,0,0,0,0,0]
-
-    # Diccionario con las polaridades según la posición del arrEmociones
+    arrEmociones = [0] * 8
     dictPolar = {0:'Positivo',1:'Negativo',2:'Negativo',3:'Negativo',
-                  4:'Positivo',5:'Negativo',6:'Neutro',7:'Negativo'}
+                  4:'Positivo',5:'Positivo',6:'Neutro',7:'Negativo'}
+    for sent in arr_sent:
+        arrEmociones[0]+=int(sent['Alegria'])
+        arrEmociones[1]+=int(sent['Colera'])
+        arrEmociones[2]+=int(sent['Miedo'])
+        arrEmociones[3]+=int(sent['Tristeza'])
+        arrEmociones[4]+=int(sent['Amor'])
+        arrEmociones[5]+=int(sent['Sorpresa'])
+        arrEmociones[6]+=int(sent['Verguenza'])
+        arrEmociones[7]+=int(sent['Aversion'])
 
-    # Incrementa la emoción en el arreglo de emociones por Emoji
-    # Esto lo hace si el emoji encontrado está en nuestro diccionario
-    for palabra in arrPalabras:
-        if (palabra in sentiments):
-            emojiDict = sentiments[palabra]
-            arrEmociones[0]+=int(emojiDict['Alegria'])
-            arrEmociones[1]+=int(emojiDict['Colera'])
-            arrEmociones[2]+=int(emojiDict['Miedo'])
-            arrEmociones[3]+=int(emojiDict['Tristeza'])
-            arrEmociones[4]+=int(emojiDict['Amor'])
-            arrEmociones[5]+=int(emojiDict['Sorpresa'])
-            arrEmociones[6]+=int(emojiDict['Verguenza'])
-            arrEmociones[7]+=int(emojiDict['Aversion'])
-
-    # Devuelve la máxima emoción
     maxEmocion = arrEmociones.index(max(arrEmociones))
-
     if max(arrEmociones) != 0:
         # Devuelve la ponderación tomando la máxima emoción encontrada
         # Si hay más de una emoción máxima, toma la primera, porque max(arrEmociones)
-        #print("Polaridad Emoji: " + dictPolar[maxEmocion])
+        print("Polaridad Emoji: " + dictPolar[maxEmocion])
 
         # Diccionario con las emociones  según la posición del arrEmociones
         dictEmociones = {0:'Alegría',1:'Cólera',2:'Miedo',3:'Tristeza',
@@ -121,29 +95,94 @@ def findEmotion(tweet, sentiments, emojis_file, text_file):
         suma = 0
         for i in arrEmociones:
             suma+=i
-        #print("Intensidad Emojis: %.2f"%(float(arrEmociones[maxEmocion])/float(suma)*100)+"%")
 
         # Devuelve la emoción generalizada tomando la máxima emoción encontrada
-        #print("Emoción Emojis: " + dictEmociones[maxEmocion])
-        print(dictEmociones[maxEmocion])
+        return dictEmociones[maxEmocion], float(arrEmociones[maxEmocion])/float(suma)*100
+        #print(dictEmociones[maxEmocion])
+    else:
+        return "Neutro", 0
 
-    #print("\n")
+def cleanWord(tweet):
+    # Separa el tweet solo considerando los espacios
+    tweetArr = tweet.split()
+    # Quita signos de puntuación del tweet
+    table = string.maketrans("","")
+    tweet =  tweet.translate(table, string.punctuation).replace("¡"," ").replace("¿"," ")
+    tweet = re.sub(r'\d+', ' numero ', tweet)
+    # Crea un arreglo separado por el delimitador \\
+    tweetArr = unicode(tweet, 'utf-8').encode('unicode_escape').split('\\')
+    # Crea un arreglo con cada palabra y emoji
+    arrPalabras=[]
+    for t in tweetArr:
+        for element in t.split():
+            arrPalabras.append(stemmer.stem(element))
+    return arrPalabras
+
+    # Ahora analizamos la emoción por cada palabra del tweet normalizado
+    # Arreglo de polaridades acumuladas por tweet
+    # Positivo, Negativo, Neutro
+    arrPolaridadGeneral = [0,0,0]
+    arrCleanTweet = clntweet.split()
+    for word in arrCleanTweet:
+        if word in polarity:
+            polaridad = polarity[word]
+            if polaridad == 'positivo':
+                arrPolaridadGeneral[0]+=1
+            elif polaridad == 'negativo':
+                arrPolaridadGeneral[1]+=1
+            elif polaridad == 'neutro':
+                arrPolaridadGeneral[2]+=1
+
+    if max(arrPolaridadGeneral) != 0:
+        # Devuelve la máxima polaridad
+        maxPolaridad = arrPolaridadGeneral.index(max(arrPolaridadGeneral))
+        if maxPolaridad == 0:
+            print("Polaridad Texto: Positivo")
+        elif maxPolaridad == 1:
+            print("Polaridad Texto: Negativo")
+        elif maxPolaridad == 2:
+            print("Polaridad Texto: Neutro")
+
+        # Devuelve la intensidad del texto, porcentualmente
+        suma = 0
+        for i in arrPolaridadGeneral:
+            suma+=i
+        print("Intensidad Texto: %.2f"%(float(arrPolaridadGeneral[maxPolaridad])/float(suma)*100)+"%")
+    else:
+        print("Polaridad Texto: Neutro")
+        print("Intensidad Texto: 0%")
+
+
+    #print(arrPolaridadGeneral)
+    for c in dictPolar:
+        if dictPolar[c] == 'Positivo':
+            arrPolaridadGeneral[0]+=arrEmociones[c]
+        elif dictPolar[c] == 'Negativo':
+            arrPolaridadGeneral[1]+=arrEmociones[c]
+        else:
+            arrPolaridadGeneral[2]+=arrEmociones[c]
+
+    if max(arrPolaridadGeneral) != 0:
+        # Devuelve la máxima polaridad
+        maxPolaridad = arrPolaridadGeneral.index(max(arrPolaridadGeneral))
+        if maxPolaridad == 0:
+            print("Polaridad emojis: Positivo")
+        elif maxPolaridad == 1:
+            print("Polaridad emojis: Negativo")
+        elif maxPolaridad == 2:
+            print("Polaridad emojis: Neutro")
+    else:
+        print("Polaridad Tweet: Neutro")
+        print("Intensidad Tweet: 0%")
+
 
 def main():
-    #print("Tweet,Emojis,Tweet Limpio")
-    # Reads the Comma Separated Value and creates a list
-    # Crea el diccionario de sentimientos
     sentiments = get_sentiment_emoji_dict('emojis.csv')
     tweets = open('yuyacst_tweets.csv', 'r')
-    #tweets = open('tweets.txt', 'r')
-    clean_emojis = open('tweet_emojis.txt', 'w+')
-    clean_tweets = open('tweet_text.txt', 'w+')
 
     tweetsArr = tweets.readlines()
     for tweet in tweetsArr:
-        #text = json.loads(tweet)['text'].split('\n')
-        #print " ".join(text)
-        findEmotion(tweet, sentiments, clean_emojis, clean_tweets)
+        findEmotion(tweet, sentiments)
 
     clean_emojis.close()
     clean_tweets.close()

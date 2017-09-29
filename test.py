@@ -6,7 +6,7 @@ import random
 from sys import exit
 import pickle
 import json, csv
-from emojis import separateTweetEmojis, cleanWord
+from emojis import *
 from math import ceil, floor
 import argparse
 from pprint import pprint
@@ -84,20 +84,31 @@ def train_classifier(classifierAlgorithm, run_validation=True):
         # predictions = classifier.classify_many(validation_set)
         pairs = zip(targets, predictions)
         true_pos = sum([1 for trgt, pred in pairs if trgt == pred == 'positivo'])
-        false_pos =  sum([1 for trgt, pred in pairs if (pred == 'positivo') and trgt == 'negativo'])
+        false_pos =  sum([1 for trgt, pred in pairs if pred == 'positivo' and (trgt == 'negativo' or trgt == 'neutro')])
         true_neg = sum([1 for trgt, pred in pairs if trgt == pred == 'negativo'])
-        false_neg =  sum([1 for trgt, pred in pairs if pred == 'negativo' and (trgt == 'negativo')])
+        false_neg =  sum([1 for trgt, pred in pairs if pred == 'negativo' and (trgt == 'positivo' or trgt == 'neutro')])
+        true_neu = sum([1 for trgt, pred in pairs if trgt == pred == 'neutro'])
+        false_neu =  sum([1 for trgt, pred in pairs if pred == 'neutro' and (trgt == 'positivo' or trgt == 'negativo')])
+
+        wrong = false_pos + false_neg + false_neu
+        good = true_pos + true_neg + true_neu
         precision = true_pos / (true_pos + false_pos)
         recall = true_pos / (true_pos + false_neg)
+        accuracy = good / (good + wrong)
         f1 = 2 * ((precision*recall) / (precision+recall))
+        hamming = 1 / (len(validation_tweets) * len(classifier.labels())) * wrong
 
         print "True positives:", true_pos
         print "True negatives:", true_neg
+        print "true neutrals:", true_neu
         print "False positives:", false_pos
         print "False negatives:", false_neg
+        print "False neutral:", false_neu
         print "Validation precision:", precision
         print "Validation recall:", recall
         print "Validation F1 score:", f1
+        print "Accuracy:", accuracy
+        print "Hamming loss:", hamming
 
     return classifier, word_features
 
@@ -114,16 +125,18 @@ else:
     f.close()
     f = open('word_features.pickle', 'r')
     word_features = pickle.load(f)
+    sentiments = get_sentiment_emoji_dict('emojis.csv')
     tweett = raw_input("tweet: ")
     extract_features = get_extract_features_fun(word_features)
     while tweett:
         # Classify new input
         # clean tweet
         emojis, text = separateTweetEmojis(tweett)
+        sentiment = get_sentiment_emoji_dict = get_sentiment_emoji_dict('emojis.csv')
+        sent, conf = emojisSentiment(emojis, sentiments)
+        print 'Emojis:', sent + ',', conf / 100
         # Separa el tweet solo considerando los espacios
         clean_text = cleanWord(text)
         dist = classifier.prob_classify(extract_features(clean_text))
-        print " ".join(clean_text) + ":", valued
-        for label in dist.samples():
-            print "%s: %f" % (label, dist.prob(label))
+        print "%s es %s: %f" % (" ".join(clean_text), dist.max(), dist.prob(dist.max()))
         tweett = raw_input("tweet: ")
